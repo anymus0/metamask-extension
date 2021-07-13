@@ -26,6 +26,8 @@ import {
   NotificationController,
   GasFeeController,
   TokenListController,
+  TokensController,
+  // TokenRatesController,
 } from '@metamask/controllers';
 import { TRANSACTION_STATUSES } from '../../shared/constants/transaction';
 import { MAINNET_CHAIN_ID } from '../../shared/constants/network';
@@ -58,10 +60,10 @@ import EncryptionPublicKeyManager from './lib/encryption-public-key-manager';
 import PersonalMessageManager from './lib/personal-message-manager';
 import TypedMessageManager from './lib/typed-message-manager';
 import TransactionController from './controllers/transactions';
-import TokenRatesController from './controllers/token-rates';
 import DetectTokensController from './controllers/detect-tokens';
 import SwapsController from './controllers/swaps';
 import { PermissionsController } from './controllers/permissions';
+import TokenRatesController from './controllers/token-rates';
 import { NOTIFICATION_NAMES } from './controllers/permissions/enums';
 import getRestrictedMethods from './controllers/permissions/restrictedMethods';
 import nodeify from './lib/nodeify';
@@ -158,6 +160,17 @@ export default class MetamaskController extends EventEmitter {
       network: this.networkController,
       provider: this.provider,
       migrateAddressBookState: this.migrateAddressBookState.bind(this),
+    });
+
+    this.tokensController = new TokensController({
+      onPreferencesStateChange: this.preferencesController.store.subscribe.bind(
+        this.preferencesController.store,
+      ),
+      onNetworkStateChange: this.networkController.store.subscribe.bind(
+        this.networkController.store,
+      ),
+      config: { provider: this.provider },
+      state: initState.TokensController,
     });
 
     this.metaMetricsController = new MetaMetricsController({
@@ -260,14 +273,27 @@ export default class MetamaskController extends EventEmitter {
       initState.NotificationController,
     );
 
-    // token exchange rate tracker
     this.tokenRatesController = new TokenRatesController({
-      preferences: this.preferencesController.store,
+      tokensController: this.tokensController,
       getNativeCurrency: () => {
         const { ticker } = this.networkController.getProviderConfig();
         return ticker ?? 'ETH';
       },
     });
+
+    // token exchange rate tracker
+    // this.tokenRatesController = new TokenRatesController({
+    //   onTokensStateChange: (listener) =>
+    //     this.tokensController.subscribe(listener),
+    //   onCurrencyRateStateChange: (listener) =>
+    //     controllerMessenger.subscribe(
+    //       `${this.currencyRateController.name}:stateChange`,
+    //       listener,
+    //     ),
+    //   onNetworkStateChange: this.networkController.store.subscribe.bind(
+    //     this.networkController.store,
+    //   ),
+    // });
 
     this.ensController = new EnsController({
       provider: this.provider,
@@ -332,6 +358,10 @@ export default class MetamaskController extends EventEmitter {
       preferencesController: this.preferencesController,
     });
 
+    this.tokensController.hub.on('pendingSuggestedAsset', async () => {
+      await opts.openPopup();
+    });
+
     const additionalKeyrings = [TrezorKeyring, LedgerBridgeKeyring];
     this.keyringController = new KeyringController({
       keyringTypes: additionalKeyrings,
@@ -365,6 +395,7 @@ export default class MetamaskController extends EventEmitter {
 
     this.detectTokensController = new DetectTokensController({
       preferences: this.preferencesController,
+      tokensController: this.tokensController,
       network: this.networkController,
       keyringMemStore: this.keyringController.memStore,
     });
@@ -544,6 +575,7 @@ export default class MetamaskController extends EventEmitter {
       NotificationController: this.notificationController,
       GasFeeController: this.gasFeeController,
       TokenListController: this.tokenListController,
+      TokensController: this.tokensController,
     });
 
     this.memStore = new ComposableObservableStore({
@@ -577,6 +609,7 @@ export default class MetamaskController extends EventEmitter {
         NotificationController: this.notificationController,
         GasFeeController: this.gasFeeController,
         TokenListController: this.tokenListController,
+        TokensController: this.tokensController,
       },
       controllerMessenger,
     });
@@ -757,6 +790,7 @@ export default class MetamaskController extends EventEmitter {
       swapsController,
       threeBoxController,
       txController,
+      tokensController,
     } = this;
 
     return {
@@ -826,18 +860,22 @@ export default class MetamaskController extends EventEmitter {
         preferencesController.setSelectedAddress,
         preferencesController,
       ),
-      addToken: nodeify(preferencesController.addToken, preferencesController),
+      addToken: nodeify(tokensController.addToken, tokensController),
+      rejectWatchAsset: nodeify(
+        tokensController.rejectWatchAsset,
+        tokensController,
+      ),
+      acceptWatchAsset: nodeify(
+        tokensController.acceptWatchAsset,
+        tokensController,
+      ),
       updateTokenType: nodeify(
-        preferencesController.updateTokenType,
-        preferencesController,
+        tokensController.updateTokenType,
+        tokensController,
       ),
       removeToken: nodeify(
-        preferencesController.removeToken,
-        preferencesController,
-      ),
-      removeSuggestedTokens: nodeify(
-        preferencesController.removeSuggestedTokens,
-        preferencesController,
+        tokensController.removeAndIgnoreToken,
+        tokensController,
       ),
       setAccountLabel: nodeify(
         preferencesController.setAccountLabel,
@@ -1280,13 +1318,15 @@ export default class MetamaskController extends EventEmitter {
   async fetchInfoToSync() {
     // Preferences
     const {
-      accountTokens,
       currentLocale,
       frequentRpcList,
       identities,
       selectedAddress,
-      tokens,
     } = this.preferencesController.store.getState();
+
+    const { tokens, allTokens } = this.tokensController.state;
+
+    const accountTokens = allTokens[selectedAddress];
 
     // Filter ERC20 tokens
     const filteredAccountTokens = {};
@@ -1309,11 +1349,14 @@ export default class MetamaskController extends EventEmitter {
     });
 
     const preferences = {
-      accountTokens: filteredAccountTokens,
       currentLocale,
       frequentRpcList,
       identities,
       selectedAddress,
+    };
+
+    const tokensController = {
+      allTokens: filteredAccountTokens,
       tokens,
     };
 
@@ -1356,6 +1399,7 @@ export default class MetamaskController extends EventEmitter {
       accounts,
       preferences,
       transactions,
+      tokensController,
       network: this.networkController.store.getState(),
     };
   }
@@ -2364,8 +2408,8 @@ export default class MetamaskController extends EventEmitter {
         sendMetrics: this.metaMetricsController.trackEvent.bind(
           this.metaMetricsController,
         ),
-        handleWatchAssetRequest: this.preferencesController.requestWatchAsset.bind(
-          this.preferencesController,
+        handleWatchAssetRequest: this.tokensController.watchAsset.bind(
+          this.tokensController,
         ),
         getWeb3ShimUsageState: this.alertController.getWeb3ShimUsageState.bind(
           this.alertController,

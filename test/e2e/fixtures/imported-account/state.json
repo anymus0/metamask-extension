@@ -97,6 +97,7 @@
       },
       "assetImages": {},
       "completedOnboarding": true,
+      "dismissSeedBackUpReminder": true,
       "currentLocale": "en",
       "featureFlags": {
         "showIncomingTransactions": true,
