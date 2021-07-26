@@ -1010,11 +1010,14 @@ const slice = createSlice({
           recipient.error = null;
         }
 
-        if(isSendingToken && isValidHexAddress(recipient.userInput)) {
+        if (isSendingToken && isValidHexAddress(recipient.userInput)) {
           const userInput = useStaticTokenList
-          ? toChecksumAddress(recipient.userInput)
-          : recipient.userInput;
-          if(tokenAddressList.includes(userInput) || checkExistingAddresses(recipient.userInput, tokens)) {
+            ? toChecksumAddress(recipient.userInput)
+            : recipient.userInput;
+          if (
+            tokenAddressList.includes(userInput) ||
+            checkExistingAddresses(recipient.userInput, tokens)
+          ) {
             recipient.warning = KNOWN_RECIPIENT_ADDRESS_WARNING;
           } else {
             recipient.warning = null;
