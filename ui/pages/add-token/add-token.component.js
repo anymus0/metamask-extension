@@ -37,6 +37,7 @@ class AddToken extends Component {
     mostRecentOverviewPage: PropTypes.string.isRequired,
     chainId: PropTypes.string,
     rpcPrefs: PropTypes.object,
+    tokenList: PropTypes.object,
   };
 
   state = {
@@ -355,8 +356,8 @@ class AddToken extends Component {
   }
 
   renderSearchToken() {
+    const { tokenList = {} } = this.props;
     const { tokenSelectorError, selectedTokens, searchResults } = this.state;
-
     return (
       <div className="add-token__search-token">
         <TokenSearch
@@ -364,6 +365,7 @@ class AddToken extends Component {
             this.setState({ searchResults: results })
           }
           error={tokenSelectorError}
+          tokenList={tokenList}
         />
         <div className="add-token__token-list">
           <TokenList
