@@ -138,7 +138,10 @@ class AddToken extends Component {
       return;
     }
 
-    const { setPendingTokens, history } = this.props;
+    const { setPendingTokens, history, tokenList } = this.props;
+    const tokenAddressList = Object.keys(tokenList).map((address) =>
+      address.toLowerCase(),
+    );
     const {
       customAddress: address,
       customSymbol: symbol,
@@ -152,12 +155,16 @@ class AddToken extends Component {
       decimals,
     };
 
-    setPendingTokens({ customToken, selectedTokens });
+    setPendingTokens({ customToken, selectedTokens, tokenAddressList });
     history.push(CONFIRM_ADD_TOKEN_ROUTE);
   }
 
   async attemptToAutoFillTokenParams(address) {
-    const { symbol = '', decimals } = await this.tokenInfoGetter(address);
+    const { tokenList } = this.props;
+    const { symbol = '', decimals } = await this.tokenInfoGetter(
+      address,
+      tokenList,
+    );
 
     const symbolAutoFilled = Boolean(symbol);
     const decimalAutoFilled = Boolean(decimals);
