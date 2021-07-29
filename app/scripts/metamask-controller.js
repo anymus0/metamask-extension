@@ -27,7 +27,6 @@ import {
   GasFeeController,
   TokenListController,
   TokensController,
-  // TokenRatesController,
 } from '@metamask/controllers';
 import { TRANSACTION_STATUSES } from '../../shared/constants/transaction';
 import { MAINNET_CHAIN_ID } from '../../shared/constants/network';
@@ -280,20 +279,6 @@ export default class MetamaskController extends EventEmitter {
         return ticker ?? 'ETH';
       },
     });
-
-    // token exchange rate tracker
-    // this.tokenRatesController = new TokenRatesController({
-    //   onTokensStateChange: (listener) =>
-    //     this.tokensController.subscribe(listener),
-    //   onCurrencyRateStateChange: (listener) =>
-    //     controllerMessenger.subscribe(
-    //       `${this.currencyRateController.name}:stateChange`,
-    //       listener,
-    //     ),
-    //   onNetworkStateChange: this.networkController.store.subscribe.bind(
-    //     this.networkController.store,
-    //   ),
-    // });
 
     this.ensController = new EnsController({
       provider: this.provider,
