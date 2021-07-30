@@ -36,6 +36,8 @@ import {
   getCurrentCurrency,
   getCurrentChainId,
   getRpcPrefsForCurrentProvider,
+  getUseStaticTokenList,
+  getTokenList,
 } from '../../../selectors';
 
 import {
@@ -97,6 +99,8 @@ export default function BuildQuote({
   const defaultSwapsToken = useSelector(getSwapsDefaultToken);
   const chainId = useSelector(getCurrentChainId);
   const rpcPrefs = useSelector(getRpcPrefsForCurrentProvider);
+  const tokenList = useSelector(getTokenList);
+  const useStaticTokenList = useSelector(getUseStaticTokenList);
 
   const tokenConversionRates = useSelector(getTokenExchangeRates, isEqual);
   const conversionRate = useSelector(getConversionRate);
@@ -130,6 +134,8 @@ export default function BuildQuote({
     conversionRate,
     currentCurrency,
     chainId,
+    tokenList,
+    useStaticTokenList,
   );
 
   const tokensToSearch = useTokensToSearch({
